@@ -1,96 +1,82 @@
-//
-// Created by Christopher Vaughn on 10/24/25.
-//
-
 #ifndef CIRCULARTEMPLATEDLIST_LINKEDLIST_H
 #define CIRCULARTEMPLATEDLIST_LINKEDLIST_H
 
-#include "Media.h"
 #include <iostream>
+#include <memory>
 
+template <typename T>
 struct Node {
-    // Data is now hard-coded to the BASE CLASS pointer: Media*
-    Media* data;
+    T* data;
     Node* next;
-
-    // Constructor initializes data and pointer
-    Node(Media* media) : data(media), next(nullptr) {}
 };
 
-// === 5. Hard-coded LinkedList Class (Singly, Non-Circular) ===
-// This list is only capable of managing Media* objects (Song*, Podcast*, etc.) and is forward-only.
-class LinkedList {
-private:
-    Node* head;
+template <typename Pointer>
+class LinkedList;
+
+template <typename T>
+class LinkedList<T*> {
+    Node<T>* head = nullptr;
+    Node<T>* tail = nullptr;
+    Node<T>* current = nullptr;
 
 public:
-    // Constructor: Initializes an empty list
-    LinkedList() : head(nullptr) {}
+    LinkedList() = default;
+    LinkedList(const LinkedList&) = delete;
+    LinkedList& operator=(const LinkedList&) = delete;
 
-    // Destructor: Cleans up all nodes and the Media objects they point to.
     ~LinkedList() {
-        Node* current = head;
-        Node* next_node = nullptr;
-
-        // Traverse the list until the end (nullptr) is reached
-        while (current != nullptr) {
-            next_node = current->next;
-
-            // Delete the Media object stored in the node's data pointer (polymorphic deletion)
-            delete current->data;
-
-            // Delete the node itself
-            delete current;
-
-            current = next_node;
+        if (tail) {
+            tail->next = nullptr;  // Break the circle before deleting nodes.
         }
-        head = nullptr; // Ensure head is reset
-        std::cout << "\n[Playlist cleanup complete. All memory deallocated.]" << std::endl;
+        while (head) {
+            Node<T>* next = head->next;
+            delete head->data;
+            delete head;
+            head = next;
+        }
     }
 
-    // Insertion: Adds a new Media pointer to the end of the list.
-    void insert(Media* newMedia) {
-        Node* newNode = new Node(newMedia);
-
-        if (head == nullptr) {
-            // Case 1: List is empty. New node becomes the head.
-            head = newNode;
+    // Each inserted item belongs to this list.
+    void insert(T* item) {
+        if (!item) return;
+        std::unique_ptr<T> owner(item);
+        Node<T>* node = new Node<T>{item, head};
+        owner.release();
+        if (!head) {
+            head = current = node;
         } else {
-            // Case 2: Traverse to the end and link the new node.
-            Node* current = head;
-            while (current->next != nullptr) {
-                current = current->next;
-            }
-            current->next = newNode;
+            tail->next = node;
         }
+        tail = node;
+        tail->next = head;
     }
 
-    // Traversal: Displays all media items in the list.
     void displayList() const {
-        if (head == nullptr) {
-            std::cout << "\n[Playlist is empty.]" << std::endl;
+        if (!head) {
+            std::cout << "[Playlist is empty.]\n";
             return;
         }
-
-        std::cout << "\n--- Current Playlist ---" << std::endl;
-        Node* current = head;
+        const Node<T>* node = head;
         int index = 1;
-        while (current != nullptr) {
-            // Polymorphism in action: calls the specific toString() method for Song or Podcast
-            std::cout << index++ << ". " << current->data->toString() << std::endl;
-            current = current->next;
-        }
-        std::cout << "------------------------" << std::endl;
+        std::cout << "\n--- Current Playlist ---\n";
+        do {
+            std::cout << index++ << ". " << node->data->toString() << '\n';
+            node = node->next;
+        } while (node != head);
     }
 
-    // Simple play method for demonstration (students will expand this later)
     void playCurrent() const {
-        if (head != nullptr) {
-            head->data->play(); // Calls the virtual play() method
+        if (current) {
+            current->data->play();
         } else {
-            std::cout << "[Playlist is empty. Nothing to play.]" << std::endl;
+            std::cout << "[Playlist is empty. Nothing to play.]\n";
         }
+    }
+
+    void playNext() {
+        if (current) current = current->next;
+        playCurrent();
     }
 };
 
-#endif //CIRCULARTEMPLATEDLIST_LINKEDLIST_H
+#endif
